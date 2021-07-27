@@ -2,7 +2,7 @@
 
 # pylint: disable=logging-fstring-interpolation,missing-class-docstring
 
-"""nocart_python
+"""nocart_python v0.1.1
 This program is a Python port of nocart.
 http://www.cpcwiki.eu/index.php/Nocart
 
@@ -180,6 +180,9 @@ class DskFile:
                 len(self.tracks)
             )
 
+    def get_min_sector_id(self) -> int:
+        return min(self.tracks[0].sectors.keys())
+
     def generate_sectors_content(self):
         for idx, track in enumerate(self.tracks):
             for sector in track.generate_sorted_sectors():
@@ -220,7 +223,6 @@ class NoCartFile(CprFile):
         self.command = command
         self.rom_path = rom_path
         self.input_dsk = input_dsk
-        self.sector_id_min = 0xC1
 
     def _add_amsdos_chunk(self) -> None:
         amsdos_content = bytearray((self.rom_path / "amsdos.rom").read_bytes())
@@ -232,6 +234,7 @@ class NoCartFile(CprFile):
             amsdos_content[0x1C03] = 0
 
         if self.input_dsk.extended:
+            logging.info("Patching rom for extended disk format")
             patch = bytes([
                 0x24, 0x00, 0x03, 0x07, 0x00, 0xfe, 0x00, 0x3f, 0x00, 0xc0, 0x00,
                 0x10, 0x00, 0x00, 0x00, 0xc1, 0x09, 0x2a, 0x52, 0xe5, 0x02, 0x04
@@ -239,7 +242,9 @@ class NoCartFile(CprFile):
             amsdos_content[0x0A43:0x0A43 + len(patch)] = patch
             amsdos_content[0x056d] = 0x41
         else:
-            amsdos_content[0x056d] = self.sector_id_min
+            min_sector_id = self.input_dsk.get_min_sector_id()
+            logging.info(f"CPC MV format. Min sector id is &{min_sector_id:02X}")
+            amsdos_content[0x056d] = min_sector_id
         self.chunks.append(amsdos_content)
 
     def generate_chunks_from_disk(self):

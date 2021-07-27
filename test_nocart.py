@@ -43,6 +43,7 @@ def test_CprFile(tmp_path, caplog):
     assert content[20 + 0xC018:33 + 0xC018] == b"ROM_3_CONTENT"
     assert content[20 + 0x10020:38 + 0x10020] == b"ROM_PADDED_CONTENT"
 
+
 @pytest.mark.parametrize(("content", "error_message"), [
     (b"xxxx", "Cannot read file header"),
     (b"FIRR\x00\x00\x00\x00plop", "Not a RIFF file"),

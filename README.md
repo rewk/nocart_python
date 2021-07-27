@@ -28,9 +28,16 @@ It doesn't require to be installed as a python package.
 
 ### Executing program
 
+To generate a CPR file from a DSK starting with run"disc":
 ```
-./nocart.py source.dsk target.cpr --command 'run"disc"'
+./nocart.py create source.dsk target.cpr --command 'run"disc"'
 ```
+
+To check a CPR file:
+```
+./nocart.py check file.cpr
+```
+
 
 ## Authors
 
