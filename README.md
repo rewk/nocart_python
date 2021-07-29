@@ -6,8 +6,11 @@ http://www.cpcwiki.eu/index.php/Nocart
 
 ## Description
 
-This program can be used to create a .cpr file from a .dsk file, to be used on a GX-4000.
+This program can be used to create a .cpr file from a .dsk file, to be used on an Amstrad GX-4000.
 (With action 'create')
+It could also be used on a 6128/464 plus, but there isn't really any reason to do so...
+
+To obtain a dump of the disk content, use option 'dump'.
 
 It can also check an existing .cpr file ('check').
 
@@ -36,6 +39,11 @@ To generate a CPR file from a DSK starting with run"disc":
 To check a CPR file:
 ```
 ./nocart.py check file.cpr
+```
+
+To dump a DSK file:
+```
+./nocart.py dump file.dsk output_dump.bin
 ```
 
 

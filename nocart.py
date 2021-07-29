@@ -2,16 +2,21 @@
 
 # pylint: disable=logging-fstring-interpolation,missing-class-docstring
 
-"""nocart_python v0.1.1
+"""nocart_python v0.2.0
 This program is a Python port of nocart.
 http://www.cpcwiki.eu/index.php/Nocart
 
-It can be used to create a .cpr file from a .dsk file, to be used on a GX-4000.
-(With action 'create')
+Action description:
 
-It can also check an existing .cpr file ('check').
+create:
+    create a .cpr file from a .dsk file, to be used on a GX-4000
 
-It was mainly done because I wanted to understand how nocart worked.
+dumpdsk:
+    dump all content of .dsk file, as if it was written on a .cpr file.
+    Can be used to patch directly the content before generating the .cpr.
+
+check:
+    check an existing .cpr file
 """
 
 import argparse
@@ -19,6 +24,7 @@ import enum
 import logging
 import struct
 
+from functools import partial
 from itertools import (
     count,
     islice,
@@ -247,7 +253,8 @@ class NoCartFile(CprFile):
             amsdos_content[0x056d] = min_sector_id
         self.chunks.append(amsdos_content)
 
-    def generate_chunks_from_disk(self):
+    def generate_chunks(self):
+        assert CART_CHUNK_SIZE // SECTOR_SIZE * SECTOR_SIZE == CART_CHUNK_SIZE
         generator = self.input_dsk.generate_sectors_content()
         while chunk_pieces := list(islice(generator, CART_CHUNK_SIZE // SECTOR_SIZE)):
             yield b"".join(chunk_pieces)
@@ -256,12 +263,13 @@ class NoCartFile(CprFile):
         self.add_rom(self.rom_path / "os.rom")
         self.add_rom(self.rom_path / "basic.rom")
         self._add_amsdos_chunk()
-        for chunk in self.generate_chunks_from_disk():
+        for chunk in self.generate_chunks():
             self.chunks.append(chunk)
         super().write(target)
 
 
-def check_cpr(cpr_path: Path) -> None:
+def check_cpr(args: argparse.Namespace) -> None:
+    cpr_path = args.source_file
     logging.info(f"Checking file {cpr_path}")
     with cpr_path.open("rb") as cpr_file:
         raw_size = cpr_path.stat().st_size
@@ -312,9 +320,30 @@ def _check_chunk(cpr_file: BinaryIO, chunk_idx: int):
         )
 
 
+def dump_dsk(args: argparse.Namespace) -> None:
+    dsk_file = DskFile(args.input_file)
+    logging.info(f"Dumping dsk file {args.input_file} into {args.output_file}")
+    sector_data = b"".join(dsk_file.generate_sectors_content())
+    args.output_file.write_bytes(sector_data)
+
+
+def create_cpr(args: argparse.Namespace) -> None:
+    if args.command and len(args.command) > BASIC_COMMAND_LENGTH:
+        logging.error(f"Basic command must be shorter than {BASIC_COMMAND_LENGTH} chars")
+    dsk_file = DskFile(args.input_file)
+    logging.info(f"Reading dsk file {args.input_file}")
+    logging.info(str(dsk_file))
+    no_cart = NoCartFile(dsk_file, args.command, args.rompath)
+    no_cart.write(args.output_file)
+
+
 class Actions(enum.Enum):
-    check = enum.auto()
-    create = enum.auto()
+    check = partial(check_cpr)
+    create = partial(create_cpr)
+    dumpdsk = partial(dump_dsk)
+
+    def __call__(self, args: argparse.Namespace):
+        self.value(args)
 
 
 def parse_args() -> argparse.Namespace:
@@ -334,24 +363,8 @@ def main():
     loglevel = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=loglevel, format="%(levelname)s:%(message)s")
 
-    action = Actions[args.action]
-    if action == Actions.check:
-
-        def command_to_run():
-            check_cpr(args.input_file)
-    elif action == Actions.create:
-        if args.command and len(args.command) > BASIC_COMMAND_LENGTH:
-            logging.error(f"Basic command must be shorter than {BASIC_COMMAND_LENGTH} chars")
-        dsk_file = DskFile(args.input_file)
-        logging.info(f"Reading dsk file {args.input_file}")
-        logging.info(str(dsk_file))
-        no_cart = NoCartFile(dsk_file, args.command, args.rompath)
-
-        def command_to_run():
-            no_cart.write(args.output_file)
-
     try:
-        command_to_run()
+        Actions[args.action](args)
     except NoCartException as exc:
         logging.error(exc)
 
