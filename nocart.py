@@ -23,6 +23,7 @@ import argparse
 import enum
 import logging
 import struct
+import sys
 
 from functools import partial
 from itertools import (
@@ -269,7 +270,7 @@ class NoCartFile(CprFile):
 
 
 def check_cpr(args: argparse.Namespace) -> None:
-    cpr_path = args.source_file
+    cpr_path = args.input_file
     logging.info(f"Checking file {cpr_path}")
     with cpr_path.open("rb") as cpr_file:
         raw_size = cpr_path.stat().st_size
@@ -321,6 +322,8 @@ def _check_chunk(cpr_file: BinaryIO, chunk_idx: int):
 
 
 def dump_dsk(args: argparse.Namespace) -> None:
+    if not args.output_file:
+        raise NoCartException("Please provide a target file for dump command.")
     dsk_file = DskFile(args.input_file)
     logging.info(f"Dumping dsk file {args.input_file} into {args.output_file}")
     sector_data = b"".join(dsk_file.generate_sectors_content())
@@ -329,7 +332,8 @@ def dump_dsk(args: argparse.Namespace) -> None:
 
 def create_cpr(args: argparse.Namespace) -> None:
     if args.command and len(args.command) > BASIC_COMMAND_LENGTH:
-        logging.error(f"Basic command must be shorter than {BASIC_COMMAND_LENGTH} chars")
+        raise NoCartException(f"Basic command must be shorter than {BASIC_COMMAND_LENGTH} chars")
+
     dsk_file = DskFile(args.input_file)
     logging.info(f"Reading dsk file {args.input_file}")
     logging.info(str(dsk_file))
@@ -367,6 +371,7 @@ def main():
         Actions[args.action](args)
     except NoCartException as exc:
         logging.error(exc)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
